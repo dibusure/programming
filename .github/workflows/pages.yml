@@ -25,7 +25,6 @@ jobs:
       - name: Set up uv and Python
         uses: astral-sh/setup-uv@v7
         with:
-          python-version-file: .python-version
           enable-cache: true
       - name: Install the locked dependency
         run: uv sync --locked
