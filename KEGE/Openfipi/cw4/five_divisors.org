@@ -1,0 +1,6 @@
+:PROPERTIES:
+:ID:       565907f2-c01e-43cc-b339-7aa9ace43270
+:END:
+#+title: Five Divisors
+#+STARTUP: linkpreviews
+[[attachment:clipboard-20261025T212147.png][clipboard-20261025T212147.png]]
