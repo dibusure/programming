@@ -1,0 +1,35 @@
+/* Official Symbols Nerd Font v3.4.0, downloaded and verified by build.py. */
+@font-face {
+  font-family: "Symbols Nerd Font";
+  src: url("fonts/SymbolsNerdFont-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+/* Never inherit Iosevka, synthetic bold/italic, or text ligatures for icons. */
+.file-icon.nerd-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  font-family: "Symbols Nerd Font";
+  font-size: 19px;
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  font-variant: normal;
+  font-feature-settings: normal;
+  font-variant-ligatures: none;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.file-badge { background: transparent; border: 0; }
+.file-badge .nerd-icon { font-size: 27px; }

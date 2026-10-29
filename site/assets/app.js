@@ -5,17 +5,24 @@ $$('.js-only').forEach((element) => { element.hidden = false; });
 const search = $('#search');
 const language = $('#language');
 const folders = $$('.tree-folder');
-const initialOpen = new Map(folders.map((folder) => [folder, folder.open]));
+let beforeSearch = null;
+// Links inside summary navigate without toggling the parent details element.
+$$('.folder-readme').forEach((link) => link.addEventListener('click', (event) => event.stopPropagation()));
 function filterFiles() {
   const query = search.value.trim().toLocaleLowerCase();
+  if (query && beforeSearch === null) {
+    beforeSearch = new Map(folders.map((folder) => [folder, folder.open]));
+  }
   $$('.tree-file').forEach((link) => {
     link.hidden = !link.dataset.search.toLocaleLowerCase().includes(query);
   });
   [...folders].reverse().forEach((folder) => {
     const matches = [...folder.querySelectorAll('.tree-file')].some((link) => !link.hidden);
     folder.hidden = !matches;
-    folder.open = query ? matches : initialOpen.get(folder);
+    if (query) folder.open = matches;
+    else if (beforeSearch !== null) folder.open = beforeSearch.get(folder);
   });
+  if (!query) beforeSearch = null;
   $('#tree-empty').hidden = $$('.tree-file').some((link) => !link.hidden);
   let count = 0;
   $$('.file-row').forEach((row) => {
