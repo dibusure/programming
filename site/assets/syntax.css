@@ -1,0 +1,45 @@
+/* Catppuccin for Pygments. Tokens use the same palette as the interface.
+   Official guidance: https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md
+   Subtext 0 is used for comments instead of Overlay 1 for better legibility. */
+.highlight { color: var(--ctp-text); background: var(--code-bg); }
+.highlight .hll { background: var(--accent-soft); }
+
+/* Comments and preprocessor directives. */
+.highlight :is(.c, .ch, .cm, .c1, .cs) { color: var(--ctp-subtext0); font-style: italic; }
+.highlight :is(.cp, .cpf) { color: var(--ctp-pink); }
+
+/* Keywords, constants, types, operators and punctuation. */
+.highlight :is(.k, .kd, .kn, .kp, .kr, .ow) { color: var(--ctp-mauve); }
+.highlight .kc { color: var(--ctp-peach); }
+.highlight .kt { color: var(--ctp-yellow); }
+.highlight .o { color: var(--ctp-sky); }
+.highlight :is(.p, .pm) { color: var(--ctp-subtext1); }
+
+/* Identifiers, functions, classes, attributes and variables. */
+.highlight :is(.n, .nx, .ni, .py, .nv, .vc, .vg, .vi, .vm) { color: var(--ctp-text); }
+.highlight :is(.nf, .fm, .nb) { color: var(--ctp-blue); }
+.highlight :is(.nc, .ne, .nn) { color: var(--ctp-yellow); }
+.highlight :is(.na, .nd) { color: var(--ctp-teal); }
+.highlight .no { color: var(--ctp-peach); }
+.highlight .bp { color: var(--ctp-red); }
+.highlight :is(.nt, .nl) { color: var(--ctp-mauve); }
+
+/* Numbers, strings and interpolation. */
+.highlight :is(.m, .mb, .mf, .mh, .mi, .il, .mo) { color: var(--ctp-peach); }
+.highlight :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .sh, .sx, .ss, .dl) { color: var(--ctp-green); }
+.highlight :is(.se, .si) { color: var(--ctp-pink); }
+.highlight .sr { color: var(--ctp-peach); }
+.highlight :is(.l, .ld) { color: var(--ctp-teal); }
+
+/* Diff, markup, errors and unclassified tokens. */
+.highlight .gd { color: var(--ctp-red); background: color-mix(in srgb,var(--ctp-red) 10%,var(--code-bg)); }
+.highlight .gi { color: var(--ctp-green); background: color-mix(in srgb,var(--ctp-green) 10%,var(--code-bg)); }
+.highlight :is(.gh, .gu) { color: var(--ctp-blue); font-weight: 600; }
+.highlight .ge { font-style: italic; }
+.highlight .gs { font-weight: bold; }
+.highlight .ges { font-style: italic; font-weight: bold; }
+.highlight .gp { color: var(--ctp-teal); }
+.highlight .go { color: var(--ctp-subtext0); }
+.highlight :is(.err, .gr, .gt) { color: var(--ctp-red); }
+.highlight .err { text-decoration: underline wavy; text-decoration-color: var(--ctp-red); }
+.highlight :is(.w, .x) { color: inherit; }

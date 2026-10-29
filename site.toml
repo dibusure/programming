@@ -1,0 +1,13 @@
+title = "programming"
+subtitle = "Код, который хочется перечитывать."
+repository = "dibusure/programming"
+branch = "main"
+source = "code"
+max_file_bytes = 524288
+exclude = ["node_modules", "vendor", "target", "build", "dist", "__pycache__", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa", "id_ed25519", "credentials*", "secrets*"]
+
+# Неоднозначное расширение можно назначить языку вручную.
+# Ключ — путь относительно code/ или маска; значение — alias Pygments.
+[lexers]
+"*.hs" = "haskell"
+"*.lhs" = "literate-haskell"

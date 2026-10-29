@@ -1,0 +1,9 @@
+[project]
+name = "programming-gallery"
+version = "1.0.0"
+description = "A small static source-code gallery for dibusure/programming"
+requires-python = ">=3.12"
+dependencies = ["Pygments==2.20.0"]
+
+[tool.uv]
+package = false
