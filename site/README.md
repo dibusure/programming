@@ -28,9 +28,19 @@ and visitors load fonts from the same origin as the website, not an external CDN
 A failed font download fails the deployment instead of silently publishing an
 incomplete build. Local Iosevka or a generic monospace font is the loading fallback.
 
-`assets/icons.svg` is a local vector sprite. `ICON_EXTENSIONS` in `build.py` maps
-file extensions to symbols, with language-aware fallbacks for extensionless
-scripts. SVG icons use the active Catppuccin palette; no icon font is required.
+File and folder icons use the official **Symbols Nerd Font 3.4.0**, not hand-drawn
+SVG approximations. `assets/nerd-icons.css` declares the separate icon typeface;
+Iosevka remains the text and code font. `ICON_EXTENSIONS` maps file extensions to
+icon names and `NERD_GLYPHS` maps those names to upstream Unicode codepoints.
+Language-aware fallbacks also cover extensionless scripts. Icons retain the
+active Catppuccin colors and are hidden from assistive technology because the
+adjacent filenames provide their accessible labels.
+
+The build downloads `SymbolsNerdFont-Regular.ttf` and its license from
+`ryanoasis/nerd-fonts` at `v3.4.0` into `dist/assets/fonts/`. The TTF is checked
+against the pinned upstream Git blob hash before publication. Visitors do not
+need any Nerd Font installed and make no third-party font requests. The old
+`assets/icons.svg` file has been removed.
 
 ## Development
 
@@ -43,8 +53,9 @@ uv run --locked python -m http.server 8000 --directory dist
 ```
 
 For an offline layout preview only, add `--skip-fonts` to the build command.
-That preview uses locally installed Iosevka or a monospace fallback. Normal
-GitHub Pages and Cloudflare Pages builds should not use this option.
+That preview uses locally installed Iosevka or a monospace fallback and does not
+include the icon font. Use a full build to inspect the Nerd Fonts icons.
+Normal GitHub Pages and Cloudflare Pages builds should not use this option.
 
 The bundled demonstration files under `code/examples/` have been removed.
 The generator still accepts arbitrary folder names, including `examples`, in

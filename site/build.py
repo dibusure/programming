@@ -105,7 +105,7 @@ def code_html(text: str, lexer) -> str:
 
 
 
-# Vector symbols, not icon-font characters: no Nerd Font installation is needed.
+# File types use the official Nerd Fonts v3.4.0 glyphs, self-hosted at build time.
 ICON_EXTENSIONS = {
     "python": "py pyw pyi pyx ipynb", "haskell": "hs lhs hsc cabal",
     "javascript": "js mjs cjs", "typescript": "ts mts cts", "react": "jsx tsx",
@@ -123,6 +123,20 @@ ICON_BY_LANGUAGE = {"Python": "python", "Haskell": "haskell", "Literate Haskell"
                     "Bash": "shell", "Fish": "shell", "PowerShell": "shell", "Docker": "config"}
 
 
+# Codepoints from ryanoasis/nerd-fonts v3.4.0/glyphnames.json.
+# Seti UI language icons, Custom C/C++, Octicons for documents and folders.
+NERD_GLYPHS = {
+    "python": 0xE606, "haskell": 0xE61F, "javascript": 0xE60C,
+    "typescript": 0xE628, "react": 0xE625, "c": 0xE61E, "cpp": 0xE61D,
+    "csharp": 0xE648, "rust": 0xE68B, "go": 0xE627, "java": 0xE66D,
+    "kotlin": 0xE634, "swift": 0xE655, "ruby": 0xE605, "php": 0xE608,
+    "lua": 0xE620, "shell": 0xF489, "database": 0xE64D,
+    "markdown": 0xE609, "text": 0xE64E, "json": 0xE60B,
+    "config": 0xE615, "html": 0xE60E, "css": 0xE614,
+    "functional": 0xF0627, "code": 0xF40D, "readme": 0xF405, "folder": 0xF413,
+}
+
+
 def file_icon(file: dict, prefix: str) -> str:
     name = file["name"].casefold()
     extension = Path(name).suffix.lstrip(".")
@@ -132,13 +146,13 @@ def file_icon(file: dict, prefix: str) -> str:
         icon = "config"
     if name in ("readme", "readme.md", "readme.markdown"):
         icon = "readme"
-    return (f'<svg class="file-icon icon-{icon}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-            f'<use href="{prefix}assets/icons.svg#{icon}"></use></svg>')
+    return (f'<span class="file-icon nerd-icon icon-{icon}" aria-hidden="true">'
+            f'&#x{NERD_GLYPHS[icon]:x};</span>')
 
 
 def folder_icon(prefix: str) -> str:
-    return (f'<svg class="file-icon folder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-            f'<use href="{prefix}assets/icons.svg#folder"></use></svg>')
+    return (f'<span class="file-icon nerd-icon folder-icon" aria-hidden="true">'
+            f'&#x{NERD_GLYPHS["folder"]:x};</span>')
 
 
 def tree_html(files: list[dict], prefix: str, active: str = "") -> str:
@@ -200,6 +214,7 @@ def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, 
 <script src="{prefix}assets/theme.js"></script>
 <link rel="icon" href="{prefix}assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{prefix}assets/fonts.css"><link rel="stylesheet" href="{prefix}assets/style.css"><link rel="stylesheet" href="{prefix}assets/syntax.css">
+<link rel="stylesheet" href="{prefix}assets/nerd-icons.css">
 <script src="{prefix}assets/app.js" defer></script></head>
 <body><a class="skip-link" href="#main">Перейти к содержимому</a>
 <header class="topbar"><a class="brand" href="{prefix}"><span class="brand-mark" aria-hidden="true">λ</span>
@@ -301,13 +316,24 @@ FONT_LICENSE_URL = "https://raw.githubusercontent.com/be5invis/Iosevka/v34.9.1/L
 FONT_FILES = ("Iosevka-Regular.woff2", "Iosevka-Medium.woff2", "Iosevka-SemiBold.woff2",
               "Iosevka-Bold.woff2", "Iosevka-Italic.woff2", "Iosevka-BoldItalic.woff2")
 
+NERD_FONT_VERSION = "v3.4.0"
+NERD_FONT_FILE = "SymbolsNerdFont-Regular.ttf"
+NERD_FONT_BLOB_SHA = "38c24fbbac296e834655a2888017d027684ff6d8"
+NERD_FONT_BASE_URL = f"https://raw.githubusercontent.com/ryanoasis/nerd-fonts/{NERD_FONT_VERSION}/patched-fonts/NerdFontsSymbolsOnly"
+NERD_FONT_LICENSE = "LICENSE-Nerd-Fonts.txt"
+
 
 def download_fonts(output: Path) -> None:
-    """Self-host pinned Iosevka webfonts and their OFL license in the published site."""
+    """Self-host pinned Iosevka and official Nerd Fonts symbols with their licenses."""
     destination = output / "assets" / "fonts"
     destination.mkdir(parents=True, exist_ok=True)
-    for name in (*FONT_FILES, "LICENSE"):
-        url = FONT_LICENSE_URL if name == "LICENSE" else f"{FONT_BASE_URL}/WOFF2/{name}"
+    for name in (*FONT_FILES, "LICENSE", NERD_FONT_FILE, NERD_FONT_LICENSE):
+        if name == NERD_FONT_FILE:
+            url = f"{NERD_FONT_BASE_URL}/{name}"
+        elif name == NERD_FONT_LICENSE:
+            url = f"{NERD_FONT_BASE_URL}/LICENSE"
+        else:
+            url = FONT_LICENSE_URL if name == "LICENSE" else f"{FONT_BASE_URL}/WOFF2/{name}"
         for attempt in range(3):
             try:
                 with urlopen(url, timeout=45) as response:
@@ -316,13 +342,17 @@ def download_fonts(output: Path) -> None:
                     raise ValueError(f"Invalid font asset size: {name}")
                 if name.endswith(".woff2") and not data.startswith(b"wOF2"):
                     raise ValueError(f"Invalid WOFF2 font: {name}")
+                if name == NERD_FONT_FILE:
+                    blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+                    if not data.startswith(b"\x00\x01\x00\x00") or blob_sha != NERD_FONT_BLOB_SHA:
+                        raise ValueError("Nerd Fonts asset does not match the pinned official font")
                 (destination / name).write_bytes(data)
                 break
             except (OSError, ValueError):
                 if attempt == 2:
                     raise
                 time.sleep(attempt + 1)
-    print("Iosevka 34.9.1: webfonts and license included in dist/assets/fonts")
+    print("Iosevka 34.9.1 + Nerd Fonts 3.4.0: fonts and licenses included in dist/assets/fonts")
 
 
 if __name__ == "__main__":

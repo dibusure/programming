@@ -1,9 +1,9 @@
-"""Regression coverage for the file explorer and self-hosted Iosevka assets."""
+"""Regression coverage for the file explorer and self-hosted font assets."""
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
-import xml.etree.ElementTree as ET
+import hashlib
 
 import unittest
 import test_build
@@ -57,19 +57,21 @@ class ExplorerTests(unittest.TestCase):
         self.assertIn('a%20%3C%26%3E%20%22quoted%22/Readme.md/', rendered)
         self.assertNotIn('<&>', rendered)
 
-    def test_every_file_icon_has_a_local_svg_symbol(self):
-        sprite = ET.parse(ROOT / 'site/assets/icons.svg')
-        symbols = {node.attrib['id'] for node in sprite.getroot()}
+    def test_every_file_icon_uses_a_nerd_font_glyph(self):
         for extension, icon in builder.ICON_BY_EXTENSION.items():
             with self.subTest(extension=extension):
-                self.assertIn(icon, symbols)
+                self.assertIn(icon, builder.NERD_GLYPHS)
                 rendered = builder.file_icon({'name': 'x.' + extension}, '../')
-                self.assertIn(f'assets/icons.svg#{icon}', rendered)
+                self.assertIn(f'&#x{builder.NERD_GLYPHS[icon]:x};', rendered)
+                self.assertIn('nerd-icon', rendered)
                 self.assertIn('aria-hidden="true"', rendered)
-        self.assertIn('icons.svg#readme', builder.file_icon({'name': 'Readme.md'}, './'))
-        self.assertIn('icons.svg#text', builder.file_icon({'name': 'notes', 'language': 'Text only'}, './'))
-        self.assertIn('icons.svg#python', builder.file_icon({'name': 'script', 'language': 'Python'}, './'))
-        self.assertIn('folder', symbols)
+                self.assertNotIn('<svg', rendered)
+                self.assertNotIn('icons.svg', rendered)
+        self.assertIn('&#xf405;', builder.file_icon({'name': 'Readme.md'}, './'))
+        self.assertIn('&#xe64e;', builder.file_icon({'name': 'notes', 'language': 'Text only'}, './'))
+        self.assertIn('&#xe606;', builder.file_icon({'name': 'script', 'language': 'Python'}, './'))
+        self.assertIn('&#xe61f;', builder.file_icon({'name': 'Main.lhs'}, './'))
+        self.assertIn('&#xf413;', builder.folder_icon('./'))
 
     def test_all_typefaces_are_iosevka_and_assets_are_same_origin(self):
         css = (ROOT / 'site/assets/style.css').read_text()
@@ -80,20 +82,40 @@ class ExplorerTests(unittest.TestCase):
         self.assertNotIn('https://', faces)
         for name in builder.FONT_FILES:
             self.assertIn(f'fonts/{name}', faces)
+        icons = (ROOT / 'site/assets/nerd-icons.css').read_text()
+        self.assertNotIn('https://', icons)
+        self.assertIn('font-family: "Symbols Nerd Font"', icons)
+        self.assertIn(f'fonts/{builder.NERD_FONT_FILE}', icons)
+        self.assertIn('font-synthesis: none', icons)
 
-    def test_font_download_includes_license_and_pinned_revision(self):
+    def test_icon_font_and_stylesheet_are_linked_on_nested_pages(self):
+        self.put('one/two/main.py', 'print(1)')
         _, output = builder.build(self.root)
+        page = (output / 'files/one/two/main.py/index.html').read_text()
+        self.assertIn('href="../../../../assets/nerd-icons.css"', page)
+        self.assertNotIn('assets/icons.svg', page)
+        self.assertTrue((output / 'assets/nerd-icons.css').is_file())
+
+    def test_font_download_includes_licenses_and_pinned_revisions(self):
+        _, output = builder.build(self.root)
+        ttf = b'\x00\x01\x00\x00test-font'
+        blob_sha = hashlib.sha1(b'blob ' + str(len(ttf)).encode() + b'\0' + ttf).hexdigest()
+
         def response(url, timeout):
-            if url == builder.FONT_LICENSE_URL:
-                self.assertIn('/be5invis/Iosevka/v34.9.1/LICENSE.md', url)
-            else:
-                self.assertIn(builder.FONT_REVISION, url)
             self.assertEqual(timeout, 45)
-            return BytesIO(b'OFL license' if url == builder.FONT_LICENSE_URL else b'wOF2test')
+            if url.startswith(builder.NERD_FONT_BASE_URL):
+                self.assertIn('/v3.4.0/', url)
+                return BytesIO(b'Nerd Fonts licenses' if url.endswith('/LICENSE') else ttf)
+            if url == builder.FONT_LICENSE_URL:
+                return BytesIO(b'OFL license')
+            self.assertIn(builder.FONT_REVISION, url)
+            return BytesIO(b'wOF2test')
+
         with patch.object(builder, 'urlopen', side_effect=response) as request:
-            builder.download_fonts(output)
-        self.assertEqual(request.call_count, len(builder.FONT_FILES) + 1)
-        for name in (*builder.FONT_FILES, 'LICENSE'):
+            with patch.object(builder, 'NERD_FONT_BLOB_SHA', blob_sha):
+                builder.download_fonts(output)
+        self.assertEqual(request.call_count, len(builder.FONT_FILES) + 3)
+        for name in (*builder.FONT_FILES, 'LICENSE', builder.NERD_FONT_FILE, builder.NERD_FONT_LICENSE):
             self.assertTrue((output / 'assets/fonts' / name).is_file())
 
     def test_invalid_fonts_fail_instead_of_publishing_a_fallback(self):
@@ -105,3 +127,16 @@ class ExplorerTests(unittest.TestCase):
         self.assertEqual(request.call_count, 3)
         self.assertFalse((output / 'assets/fonts' / builder.FONT_FILES[0]).exists())
 
+    def test_wrong_nerd_font_hash_fails_the_build(self):
+        _, output = builder.build(self.root)
+
+        def response(url, timeout):
+            if url.endswith(builder.NERD_FONT_FILE):
+                return BytesIO(b'\x00\x01\x00\x00wrong-font')
+            return BytesIO(b'OFL license' if url == builder.FONT_LICENSE_URL else b'wOF2test')
+
+        with patch.object(builder, 'urlopen', side_effect=response):
+            with patch.object(builder.time, 'sleep'):
+                with self.assertRaisesRegex(ValueError, 'pinned official font'):
+                    builder.download_fonts(output)
+        self.assertFalse((output / 'assets/fonts' / builder.NERD_FONT_FILE).exists())
