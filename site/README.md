@@ -19,14 +19,19 @@ expansion state from before searching. Expansion is not persisted between pages.
 
 ## Typography and icons
 
-All interface text and source code use Iosevka. `assets/fonts.css` declares the
-regular, medium, semibold, bold, italic and bold-italic faces. The CLI build
-downloads Iosevka 34.9.1 from a pinned revision of `iosevka-webfonts/iosevka`
-and its SIL Open Font License from the upstream `be5invis/Iosevka` v34.9.1
-release into `dist/assets/fonts/`. No font files are committed,
-and visitors load fonts from the same origin as the website, not an external CDN.
-A failed font download fails the deployment instead of silently publishing an
-incomplete build. Local Iosevka or a generic monospace font is the loading fallback.
+**Rubik** is used for ordinary text, headings, UI labels, controls, and
+descriptions. Its self-hosted variable regular and italic fonts include Cyrillic
+and Latin. **Iosevka 34.9.1** stays in the code viewer, inline code, file and
+directory names, paths, and technical monospace labels. Catppuccin Latte/Mocha
+theme switching is unchanged.
+
+`assets/fonts.css` defines both typefaces. The build downloads Rubik
+from the pinned `google/fonts` revision, verifies the files (including the
+SIL Open Font License) against their upstream Git blob SHA, and copies them into
+`dist/assets/fonts/`. Iosevka also comes from its pinned source and includes
+its license. Nothing is fetched from a third-party font CDN in the visitor's
+browser; failed downloads and mismatches fail the build instead of publishing
+a broken website.
 
 File and folder icons use the official **Symbols Nerd Font 3.4.0**, not hand-drawn
 SVG approximations. `assets/nerd-icons.css` declares the separate icon typeface;
@@ -53,7 +58,7 @@ uv run --locked python -m http.server 8000 --directory dist
 ```
 
 For an offline layout preview only, add `--skip-fonts` to the build command.
-That preview uses locally installed Iosevka or a monospace fallback and does not
+That preview uses locally installed fonts or system fallbacks and does not
 include the icon font. Use a full build to inspect the Nerd Fonts icons.
 Normal GitHub Pages and Cloudflare Pages builds should not use this option.
 

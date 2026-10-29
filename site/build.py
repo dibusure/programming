@@ -322,13 +322,27 @@ NERD_FONT_BLOB_SHA = "38c24fbbac296e834655a2888017d027684ff6d8"
 NERD_FONT_BASE_URL = f"https://raw.githubusercontent.com/ryanoasis/nerd-fonts/{NERD_FONT_VERSION}/patched-fonts/NerdFontsSymbolsOnly"
 NERD_FONT_LICENSE = "LICENSE-Nerd-Fonts.txt"
 
+# Rubik variable fonts, including Cyrillic, from immutable Google Fonts sources.
+RUBIK_REVISION = "8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5"
+RUBIK_FONT_BASE_URL = f"https://raw.githubusercontent.com/google/fonts/{RUBIK_REVISION}/ofl/rubik"
+RUBIK_FONT_FILES = {
+    "Rubik-Variable.ttf": ("Rubik%5Bwght%5D.ttf", "a59aeb632df494345a542697c357f608875481b0"),
+    "Rubik-Italic-Variable.ttf": ("Rubik-Italic%5Bwght%5D.ttf", "2d9fcc4cf00e21f231277467b50eb80a2779a356"),
+}
+RUBIK_FONT_LICENSE = "LICENSE-Rubik.txt"
+RUBIK_LICENSE_BLOB_SHA = "03af63b533942ef3bb9919f81138fde8824d4554"
+
 
 def download_fonts(output: Path) -> None:
-    """Self-host pinned Iosevka and official Nerd Fonts symbols with their licenses."""
+    """Self-host pinned Iosevka, Rubik and Nerd Fonts with their licenses."""
     destination = output / "assets" / "fonts"
     destination.mkdir(parents=True, exist_ok=True)
-    for name in (*FONT_FILES, "LICENSE", NERD_FONT_FILE, NERD_FONT_LICENSE):
-        if name == NERD_FONT_FILE:
+    for name in (*FONT_FILES, "LICENSE", NERD_FONT_FILE, NERD_FONT_LICENSE, *RUBIK_FONT_FILES, RUBIK_FONT_LICENSE):
+        if name in RUBIK_FONT_FILES:
+            url = f"{RUBIK_FONT_BASE_URL}/{RUBIK_FONT_FILES[name][0]}"
+        elif name == RUBIK_FONT_LICENSE:
+            url = f"{RUBIK_FONT_BASE_URL}/OFL.txt"
+        elif name == NERD_FONT_FILE:
             url = f"{NERD_FONT_BASE_URL}/{name}"
         elif name == NERD_FONT_LICENSE:
             url = f"{NERD_FONT_BASE_URL}/LICENSE"
@@ -346,19 +360,24 @@ def download_fonts(output: Path) -> None:
                     blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
                     if not data.startswith(b"\x00\x01\x00\x00") or blob_sha != NERD_FONT_BLOB_SHA:
                         raise ValueError("Nerd Fonts asset does not match the pinned official font")
+                if name in RUBIK_FONT_FILES or name == RUBIK_FONT_LICENSE:
+                    expected_sha = RUBIK_FONT_FILES[name][1] if name in RUBIK_FONT_FILES else RUBIK_LICENSE_BLOB_SHA
+                    blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+                    if (name in RUBIK_FONT_FILES and not data.startswith(b"\x00\x01\x00\x00")) or blob_sha != expected_sha:
+                        raise ValueError(f"Rubik asset does not match the pinned official source: {name}")
                 (destination / name).write_bytes(data)
                 break
             except (OSError, ValueError):
                 if attempt == 2:
                     raise
                 time.sleep(attempt + 1)
-    print("Iosevka 34.9.1 + Nerd Fonts 3.4.0: fonts and licenses included in dist/assets/fonts")
+    print("Iosevka 34.9.1 + Rubik variable + Nerd Fonts 3.4.0: self-hosted fonts and licenses included")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-fonts", action="store_true",
-                        help="Offline preview only: skip downloading webfonts (uses local Iosevka or monospace).")
+                        help="Offline preview only: skip downloading webfonts (uses locally installed fonts or system fallbacks).")
     args = parser.parse_args()
     _, output = build()
     if not args.skip_fonts:
