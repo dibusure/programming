@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import tomllib
 from urllib.parse import quote
+from urllib.request import urlopen
+import time
 
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
@@ -102,6 +104,43 @@ def code_html(text: str, lexer) -> str:
     return '<pre class="highlight" tabindex="0" aria-label="Исходный код"><code>' + "\n".join(rows) + '</code></pre>'
 
 
+
+# Vector symbols, not icon-font characters: no Nerd Font installation is needed.
+ICON_EXTENSIONS = {
+    "python": "py pyw pyi pyx ipynb", "haskell": "hs lhs hsc cabal",
+    "javascript": "js mjs cjs", "typescript": "ts mts cts", "react": "jsx tsx",
+    "c": "c h", "cpp": "cpp cc cxx hpp hh hxx", "csharp": "cs csx",
+    "rust": "rs", "go": "go", "java": "java class jar", "kotlin": "kt kts",
+    "swift": "swift", "ruby": "rb rake gemspec", "php": "php phtml",
+    "lua": "lua", "shell": "sh bash zsh fish ps1 bat cmd", "database": "sql sqlite db",
+    "markdown": "md markdown mdx", "text": "txt rst org log", "json": "json jsonc jsonl",
+    "config": "toml yaml yml ini conf cfg lock", "html": "html htm xml svg",
+    "css": "css scss sass less", "functional": "ml mli fs fsx clj cljs cljc ex exs erl hrl lisp el scm rkt",
+    "code": "dart scala pl pm r jl zig nim v asm s vue svelte",
+}
+ICON_BY_EXTENSION = {ext: icon for icon, extensions in ICON_EXTENSIONS.items() for ext in extensions.split()}
+ICON_BY_LANGUAGE = {"Python": "python", "Haskell": "haskell", "Literate Haskell": "haskell",
+                    "Bash": "shell", "Fish": "shell", "PowerShell": "shell", "Docker": "config"}
+
+
+def file_icon(file: dict, prefix: str) -> str:
+    name = file["name"].casefold()
+    extension = Path(name).suffix.lstrip(".")
+    icon = ICON_BY_EXTENSION.get(extension, ICON_BY_LANGUAGE.get(file.get("language"),
+                                "text" if file.get("language") == "Text only" else "code"))
+    if name in ("makefile", "dockerfile", "justfile", "cmakelists.txt"):
+        icon = "config"
+    if name in ("readme", "readme.md", "readme.markdown"):
+        icon = "readme"
+    return (f'<svg class="file-icon icon-{icon}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+            f'<use href="{prefix}assets/icons.svg#{icon}"></use></svg>')
+
+
+def folder_icon(prefix: str) -> str:
+    return (f'<svg class="file-icon folder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+            f'<use href="{prefix}assets/icons.svg#folder"></use></svg>')
+
+
 def tree_html(files: list[dict], prefix: str, active: str = "") -> str:
     tree: dict = {"dirs": {}, "files": []}
     for file in files:
@@ -114,14 +153,26 @@ def tree_html(files: list[dict], prefix: str, active: str = "") -> str:
         result = []
         for name, child in sorted(node["dirs"].items(), key=lambda item: item[0].casefold()):
             full = trail + name + "/"
-            opened = " open" if not trail or active.startswith(full) else ""
-            result.append(f'<details class="tree-folder"{opened}><summary>{esc(name)}</summary>'
+            # All folders start closed, including ancestors of the current file.
+            # An anchor inside summary navigates; the independent chevron toggles details.
+            readme = next((f for f in sorted(child["files"], key=lambda f: f["name"])
+                           if f["name"].casefold() == "readme.md"), None)
+            label = f'{folder_icon(prefix)}<span class="folder-name">{esc(name)}</span>'
+            if readme:
+                current = ' aria-current="page"' if readme["path"] == active else ""
+                label = (f'<a class="folder-readme" href="{prefix}{readme["url"]}"{current} '
+                         f'title="Открыть {esc(readme["path"], quote=True)}">{label}</a>')
+            else:
+                label = f'<span class="folder-label">{label}</span>'
+            result.append(f'<details class="tree-folder"><summary title="Раскрыть или свернуть папку">'
+                          f'<svg class="folder-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+                          f'<path d="m9 5 7 7-7 7"/></svg>{label}</summary>'
                           f'<div class="tree-children">{render(child, full)}</div></details>')
         for file in node["files"]:
             selected = ' aria-current="page"' if file["path"] == active else ""
             search = esc(file["path"] + " " + file["language"], quote=True)
             result.append(f'<a class="tree-file" data-search="{search}" href="{prefix}{file["url"]}"{selected}>'
-                          f'<span class="file-dot" aria-hidden="true"></span>{esc(file["name"])}</a>')
+                          f'{file_icon(file, prefix)}<span class="file-name">{esc(file["name"])}</span></a>')
         return "".join(result)
     return render(tree)
 
@@ -148,7 +199,7 @@ def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, 
 <title>{esc(title)} · {esc(config['repository'])}</title>
 <script src="{prefix}assets/theme.js"></script>
 <link rel="icon" href="{prefix}assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="{prefix}assets/style.css"><link rel="stylesheet" href="{prefix}assets/syntax.css">
+<link rel="stylesheet" href="{prefix}assets/fonts.css"><link rel="stylesheet" href="{prefix}assets/style.css"><link rel="stylesheet" href="{prefix}assets/syntax.css">
 <script src="{prefix}assets/app.js" defer></script></head>
 <body><a class="skip-link" href="#main">Перейти к содержимому</a>
 <header class="topbar"><a class="brand" href="{prefix}"><span class="brand-mark" aria-hidden="true">λ</span>
@@ -177,11 +228,10 @@ def homepage(config: dict, files: list[dict]) -> str:
     options = ''.join(f'<option value="{esc(lang, quote=True)}">{esc(lang)}</option>' for lang in languages)
     rows = []
     for file in files:
-        badge = Path(file["name"]).suffix.lstrip(".")[:5] or "txt"
         folder = config["source"].strip("/") + "/" + (file["folder"] + "/" if file["folder"] != "." else "")
         rows.append(f'<a class="file-row" data-search="{esc(file["path"] + " " + file["language"], quote=True)}" '
                     f'data-language="{esc(file["language"], quote=True)}" href="{file["url"]}">'
-                    f'<span class="file-badge">{esc(badge)}</span><span class="file-label"><strong>{esc(file["name"])}</strong>'
+                    f'<span class="file-badge">{file_icon(file, "./")}</span><span class="file-label"><strong>{esc(file["name"])}</strong>'
                     f'<small>{esc(folder)}</small></span><span class="language-label">{esc(file["language"])}</span>'
                     f'<span class="row-lines">{file["lines"]} стр.</span><span class="row-arrow" aria-hidden="true">↗</span></a>')
     empty = '<div class="empty-state"><h2>Здесь начинается коллекция.</h2><p>Добавь первый исходник в папку <code>code/</code> и сделай push.</p></div>' if not files else ""
@@ -204,7 +254,7 @@ def filepage(config: dict, file: dict, prefix: str, rev: str) -> str:
     return f'''<div class="breadcrumbs"><a href="{prefix}">Коллекция</a><span>/</span><span>{esc(file['path'])}</span></div>
 <section class="file-heading"><div><div class="eyebrow">{esc(file['language'])}</div><h1>{esc(file['name'])}</h1>
 <p>{file['lines']} {plural(file['lines'], 'строка', 'строки', 'строк')} <span>·</span> {size} <span>·</span> UTF-8</p></div><a class="source-link" href="{github}">Открыть на GitHub ↗</a></section>
-<section class="code-panel" aria-label="Просмотр исходника"><div class="code-toolbar"><span class="code-tab">{esc(file['name'])}</span>
+<section class="code-panel" aria-label="Просмотр исходника"><div class="code-toolbar"><span class="code-tab">{file_icon(file, prefix)}{esc(file['name'])}</span>
 <div class="code-actions"><button id="wrap-toggle" class="toolbar-button js-only" type="button" aria-pressed="false" hidden>Перенос</button>
 <button id="copy-code" class="toolbar-button js-only" type="button" hidden>Копировать</button>
 <a class="toolbar-button" href="{prefix}{file['raw_url']}" download="{esc(file['name'], quote=True)}">Скачать</a></div></div>
@@ -245,7 +295,41 @@ def build(root: Path = ROOT) -> tuple[int, Path]:
     return len(files), output
 
 
+FONT_REVISION = "9c6fe7fbf1f00b90eb2ee09a98739c9e0853ac6e"  # Iosevka 34.9.1
+FONT_BASE_URL = f"https://raw.githubusercontent.com/iosevka-webfonts/iosevka/{FONT_REVISION}"
+FONT_LICENSE_URL = "https://raw.githubusercontent.com/be5invis/Iosevka/v34.9.1/LICENSE.md"
+FONT_FILES = ("Iosevka-Regular.woff2", "Iosevka-Medium.woff2", "Iosevka-SemiBold.woff2",
+              "Iosevka-Bold.woff2", "Iosevka-Italic.woff2", "Iosevka-BoldItalic.woff2")
+
+
+def download_fonts(output: Path) -> None:
+    """Self-host pinned Iosevka webfonts and their OFL license in the published site."""
+    destination = output / "assets" / "fonts"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in (*FONT_FILES, "LICENSE"):
+        url = FONT_LICENSE_URL if name == "LICENSE" else f"{FONT_BASE_URL}/WOFF2/{name}"
+        for attempt in range(3):
+            try:
+                with urlopen(url, timeout=45) as response:
+                    data = response.read(4 * 1024 * 1024 + 1)
+                if len(data) > 4 * 1024 * 1024 or not data:
+                    raise ValueError(f"Invalid font asset size: {name}")
+                if name.endswith(".woff2") and not data.startswith(b"wOF2"):
+                    raise ValueError(f"Invalid WOFF2 font: {name}")
+                (destination / name).write_bytes(data)
+                break
+            except (OSError, ValueError):
+                if attempt == 2:
+                    raise
+                time.sleep(attempt + 1)
+    print("Iosevka 34.9.1: webfonts and license included in dist/assets/fonts")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
-    build()
+    parser.add_argument("--skip-fonts", action="store_true",
+                        help="Offline preview only: skip downloading webfonts (uses local Iosevka or monospace).")
+    args = parser.parse_args()
+    _, output = build()
+    if not args.skip_fonts:
+        download_fonts(output)

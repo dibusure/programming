@@ -1,0 +1,25 @@
+/* Iosevka 34.9.1, SIL Open Font License. Downloaded at build time; no third-party browser requests. */
+@font-face {
+  font-family: 'Iosevka'; font-style: normal; font-weight: 400; font-display: swap;
+  src: local('Iosevka Regular'), url('fonts/Iosevka-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka'; font-style: normal; font-weight: 500; font-display: swap;
+  src: local('Iosevka Medium'), url('fonts/Iosevka-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka'; font-style: normal; font-weight: 600; font-display: swap;
+  src: local('Iosevka SemiBold'), url('fonts/Iosevka-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka'; font-style: normal; font-weight: 700; font-display: swap;
+  src: local('Iosevka Bold'), url('fonts/Iosevka-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka'; font-style: italic; font-weight: 400; font-display: swap;
+  src: local('Iosevka Italic'), url('fonts/Iosevka-Italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Iosevka'; font-style: italic; font-weight: 700; font-display: swap;
+  src: local('Iosevka BoldItalic'), url('fonts/Iosevka-BoldItalic.woff2') format('woff2');
+}
