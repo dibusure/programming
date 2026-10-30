@@ -66,7 +66,7 @@ class DirectoryPagesTests(unittest.TestCase):
         folder = (output / 'folders/русский/index.html').read_text()
         filepage = (output / 'files/русский/имя #1 <&>.hs/index.html').read_text()
         self.assertIn('href="../../folders/"', folder)  # Parent code/
-        self.assertIn('href="../../../folders/русский/"', filepage)
+        self.assertIn('href="../../../' + builder.folder_url('русский') + '"', filepage)
         self.assertIn('имя #1 &lt;&amp;&gt;.hs', filepage)
         self.assertIn('href="' + builder.folder_url('русский') + '"', (output / 'index.html').read_text())
 
