@@ -35,7 +35,7 @@ class DirectoryPagesTests(unittest.TestCase):
         _, output = builder.build(self.root)
         for folder in ('', 'c', 'c/aesc informatix', 'c/aesc informatix/entrance'):
             with self.subTest(folder=folder):
-                page = output / builder.folder_url(folder) / 'index.html'
+                page = output / 'folders' / folder / 'index.html'
                 self.assertTrue(page.is_file(), page)
                 html = page.read_text()
                 self.assertIn('id="copy-folder-link"', html)
@@ -68,7 +68,7 @@ class DirectoryPagesTests(unittest.TestCase):
         self.assertIn('href="../../folders/"', folder)  # Parent code/
         self.assertIn('href="../../../folders/русский/"', filepage)
         self.assertIn('имя #1 &lt;&amp;&gt;.hs', filepage)
-        self.assertIn('href="folders/русский/"', (output / 'index.html').read_text())
+        self.assertIn('href="' + builder.folder_url('русский') + '"', (output / 'index.html').read_text())
 
     def test_empty_hidden_excluded_and_symlinked_folders(self):
         self.put('public/main.py', 'print(1)')
