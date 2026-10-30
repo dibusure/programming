@@ -73,14 +73,23 @@ class ExplorerTests(unittest.TestCase):
         self.assertIn('&#xe61f;', builder.file_icon({'name': 'Main.lhs'}, './'))
         self.assertIn('&#xf413;', builder.folder_icon('./'))
 
-    def test_all_typefaces_are_iosevka_and_assets_are_same_origin(self):
+    def test_rubik_ui_and_iosevka_code_with_same_origin_assets(self):
         css = (ROOT / 'site/assets/style.css').read_text()
         faces = (ROOT / 'site/assets/fonts.css').read_text()
         self.assertIn("--mono: 'Iosevka', monospace", css)
+        self.assertIn("--sans: 'Rubik', sans-serif", css)
+        self.assertIn('font:16px/1.6 var(--sans)', css)
+        self.assertIn('font:14px/1.9 var(--mono)', css)
+        self.assertIn("code {font-family:var(--mono)}", css)
+        self.assertIn('font:12px/1.5 var(--sans)', css)  # theme buttons
+        self.assertIn('font:500 clamp(22px,3vw,35px)/1.3 var(--mono)', css)  # filename
+        self.assertIn("font-family: 'Rubik'", faces)
+        self.assertIn('font-weight: 300 900', faces)
+        self.assertIn("font-style: italic; font-weight: 300 900", faces)
         for old in ('system-ui', 'Georgia', 'Segoe UI', 'Consolas', 'SFMono'):
             self.assertNotIn(old, css)
         self.assertNotIn('https://', faces)
-        for name in builder.FONT_FILES:
+        for name in (*builder.FONT_FILES, *builder.RUBIK_FONT_FILES):
             self.assertIn(f'fonts/{name}', faces)
         icons = (ROOT / 'site/assets/nerd-icons.css').read_text()
         self.assertNotIn('https://', icons)
@@ -99,10 +108,15 @@ class ExplorerTests(unittest.TestCase):
     def test_font_download_includes_licenses_and_pinned_revisions(self):
         _, output = builder.build(self.root)
         ttf = b'\x00\x01\x00\x00test-font'
+        rubik_license = b'Rubik OFL test license'
         blob_sha = hashlib.sha1(b'blob ' + str(len(ttf)).encode() + b'\0' + ttf).hexdigest()
+        license_sha = hashlib.sha1(b'blob ' + str(len(rubik_license)).encode() + b'\0' + rubik_license).hexdigest()
 
         def response(url, timeout):
             self.assertEqual(timeout, 45)
+            if url.startswith(builder.RUBIK_FONT_BASE_URL):
+                self.assertIn(builder.RUBIK_REVISION, url)
+                return BytesIO(rubik_license if url.endswith('/OFL.txt') else ttf)
             if url.startswith(builder.NERD_FONT_BASE_URL):
                 self.assertIn('/v3.4.0/', url)
                 return BytesIO(b'Nerd Fonts licenses' if url.endswith('/LICENSE') else ttf)
@@ -113,9 +127,13 @@ class ExplorerTests(unittest.TestCase):
 
         with patch.object(builder, 'urlopen', side_effect=response) as request:
             with patch.object(builder, 'NERD_FONT_BLOB_SHA', blob_sha):
-                builder.download_fonts(output)
-        self.assertEqual(request.call_count, len(builder.FONT_FILES) + 3)
-        for name in (*builder.FONT_FILES, 'LICENSE', builder.NERD_FONT_FILE, builder.NERD_FONT_LICENSE):
+                with patch.object(builder, 'RUBIK_FONT_FILES', {name: (upstream, blob_sha)
+                    for name, (upstream, _) in builder.RUBIK_FONT_FILES.items()}):
+                    with patch.object(builder, 'RUBIK_LICENSE_BLOB_SHA', license_sha):
+                        builder.download_fonts(output)
+        self.assertEqual(request.call_count, len(builder.FONT_FILES) + 4 + len(builder.RUBIK_FONT_FILES))
+        for name in (*builder.FONT_FILES, 'LICENSE', builder.NERD_FONT_FILE, builder.NERD_FONT_LICENSE,
+                     *builder.RUBIK_FONT_FILES, builder.RUBIK_FONT_LICENSE):
             self.assertTrue((output / 'assets/fonts' / name).is_file())
 
     def test_invalid_fonts_fail_instead_of_publishing_a_fallback(self):
@@ -140,3 +158,22 @@ class ExplorerTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'pinned official font'):
                     builder.download_fonts(output)
         self.assertFalse((output / 'assets/fonts' / builder.NERD_FONT_FILE).exists())
+
+    def test_corrupt_rubik_is_rejected_even_if_it_is_a_valid_ttf_header(self):
+        _, output = builder.build(self.root)
+        nerd = b"\x00\x01\x00\x00nerd"
+        nerd_sha = hashlib.sha1(b"blob " + str(len(nerd)).encode() + b"\0" + nerd).hexdigest()
+
+        def response(url, timeout):
+            if url.startswith(builder.RUBIK_FONT_BASE_URL):
+                return BytesIO(b"\x00\x01\x00\x00tampered")
+            if url.endswith(builder.NERD_FONT_FILE):
+                return BytesIO(nerd)
+            return BytesIO(b'OFL license' if url.endswith('/LICENSE') or url.endswith('.md') else b'wOF2test')
+
+        with patch.object(builder, 'urlopen', side_effect=response):
+            with patch.object(builder, 'NERD_FONT_BLOB_SHA', nerd_sha):
+                with patch.object(builder.time, 'sleep'):
+                    with self.assertRaisesRegex(ValueError, 'Rubik asset does not match'):
+                        builder.download_fonts(output)
+        self.assertFalse((output / 'assets/fonts/Rubik-Variable.ttf').exists())
