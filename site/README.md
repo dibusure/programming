@@ -10,9 +10,19 @@ The chevron expands or collapses a folder independently of navigation.
 
 A folder with a direct child named `Readme.md` links its name and folder icon to
 that file's page. Matching is case-insensitive: `README.md` and `readme.md` work
-too. A README in a nested subfolder is not used for its parent. A folder without
-a README toggles when its name is clicked. Native `details` and `summary`
-elements preserve keyboard access and navigation without JavaScript.
+too. A README in a nested subfolder is not used for its parent. A folder without a README opens its directory page when its name is clicked.
+Every folder also has a separate link icon pointing to the directory page,
+so README navigation and folder browsing are independent. The chevron controls
+expansion. Native `details` and `summary` preserve keyboard access.
+
+Each visible directory, including an empty one, has a direct static URL at
+`/folders/<path>/`. `/folders/` is the root `code/` directory.
+Directory pages list immediate subfolders (first) and files, offer clickable
+breadcrumbs, a link to the same folder on GitHub, and a copy-URL button.
+File-page breadcrumbs also link to parent directory pages. All names are
+escaped for safe HTML and valid URLs, supporting Cyrillic and punctuation.
+Hidden, excluded, and symlinked directories never get pages.
+Folder pages work without JavaScript; the copy button needs JS and HTTPS.
 
 Search temporarily expands matching branches. Clearing the query restores the
 expansion state from before searching. Expansion is not persisted between pages.

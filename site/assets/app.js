@@ -7,7 +7,8 @@ const language = $('#language');
 const folders = $$('.tree-folder');
 let beforeSearch = null;
 // Links inside summary navigate without toggling the parent details element.
-$$('.folder-readme').forEach((link) => link.addEventListener('click', (event) => event.stopPropagation()));
+$('.folder-readme, .folder-browse, .folder-direct-link').forEach((link) =>
+  link.addEventListener('click', (event) => event.stopPropagation()));
 function filterFiles() {
   const query = search.value.trim().toLocaleLowerCase();
   if (query && beforeSearch === null) {
@@ -17,13 +18,15 @@ function filterFiles() {
     link.hidden = !link.dataset.search.toLocaleLowerCase().includes(query);
   });
   [...folders].reverse().forEach((folder) => {
-    const matches = [...folder.querySelectorAll('.tree-file')].some((link) => !link.hidden);
-    folder.hidden = !matches;
+    const matches = [...folder.querySelectorAll('.tree-file')].some((link) => !link.hidden)
+      || Boolean(query && folder.dataset.folderPath.toLocaleLowerCase().includes(query));
+    folder.hidden = Boolean(query) && !matches;
     if (query) folder.open = matches;
     else if (beforeSearch !== null) folder.open = beforeSearch.get(folder);
   });
   if (!query) beforeSearch = null;
-  $('#tree-empty').hidden = $$('.tree-file').some((link) => !link.hidden);
+  $('#tree-empty').hidden = $('.tree-file').some((link) => !link.hidden)
+    || folders.some((folder) => !folder.hidden);
   let count = 0;
   $$('.file-row').forEach((row) => {
     row.hidden = !row.dataset.search.toLocaleLowerCase().includes(query)
@@ -68,4 +71,13 @@ $('#copy-code')?.addEventListener('click', async () => {
 $('#wrap-toggle')?.addEventListener('click', (event) => {
   const enabled = $('.code-panel').classList.toggle('wrap');
   event.currentTarget.setAttribute('aria-pressed', String(enabled));
+});
+
+$('#copy-folder-link')?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    toast('Ссылка на папку скопирована');
+  } catch (_) {
+    toast('Не удалось скопировать. Скопируй адрес из строки браузера.');
+  }
 });

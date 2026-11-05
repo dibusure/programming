@@ -91,6 +91,37 @@ def collect(source: Path, config: dict) -> list[dict]:
     return sorted(files, key=lambda f: f["path"].casefold())
 
 
+
+def collect_folders(source: Path, config: dict) -> list[str]:
+    """Directories visible on the public site, including empty directories."""
+    if source.is_symlink() or not source.is_dir():
+        raise ValueError("Исходная папка отсутствует или является символьной ссылкой.")
+    folders = []
+    for directory, dirs, _ in os.walk(source, followlinks=False):
+        parent = Path(directory)
+        dirs[:] = sorted(d for d in dirs if not (parent / d).is_symlink()
+                         and not excluded((parent / d).relative_to(source), config["exclude"]))
+        folders.extend((parent / d).relative_to(source).as_posix() for d in dirs)
+    return sorted(folders, key=str.casefold)
+
+
+def folder_url(folder: str) -> str:
+    return "folders/" + (quote(folder, safe="/") + "/" if folder else "")
+
+
+def breadcrumbs(path: str, prefix: str) -> str:
+    """Link every parent in a file or directory path."""
+    parts = path.split("/") if path else []
+    items = [f'<a href="{prefix}">Коллекция</a>', '<span>/</span>',
+             f'<a href="{prefix}folders/">code</a>' if parts else '<span aria-current="page">code</span>']
+    for i, name in enumerate(parts):
+        items.append('<span>/</span>')
+        items.append(f'<a href="{prefix}{folder_url("/".join(parts[:i+1]))}">{esc(name)}</a>'
+                     if i < len(parts) - 1 else
+                     f'<span aria-current="page">{esc(name)}</span>')
+    return '<nav class="breadcrumbs" aria-label="Путь к файлу или папке">' + "".join(items) + '</nav>'
+
+
 def code_html(text: str, lexer) -> str:
     rendered = highlight(text, lexer, HtmlFormatter(nowrap=True)).split("\n")
     count = text.count("\n") + int(bool(text) and not text.endswith("\n"))
@@ -155,8 +186,16 @@ def folder_icon(prefix: str) -> str:
             f'&#x{NERD_GLYPHS["folder"]:x};</span>')
 
 
-def tree_html(files: list[dict], prefix: str, active: str = "") -> str:
+def tree_html(files: list[dict], prefix: str, active: str = "",
+              folders: list[str] | None = None, active_folder: str = "") -> str:
     tree: dict = {"dirs": {}, "files": []}
+    if folders is None:
+        folders = sorted({"/".join(f["path"].split("/")[:i])
+                          for f in files for i in range(1, len(f["path"].split("/")))}, key=str.casefold)
+    for folder in folders:
+        node = tree
+        for part in folder.split("/"):
+            node = node["dirs"].setdefault(part, {"dirs": {}, "files": []})
     for file in files:
         node = tree
         for part in file["path"].split("/")[:-1]:
@@ -172,15 +211,22 @@ def tree_html(files: list[dict], prefix: str, active: str = "") -> str:
             readme = next((f for f in sorted(child["files"], key=lambda f: f["name"])
                            if f["name"].casefold() == "readme.md"), None)
             label = f'{folder_icon(prefix)}<span class="folder-name">{esc(name)}</span>'
+            href = prefix + folder_url(full[:-1])
+            current_folder = ' aria-current="page"' if full[:-1] == active_folder else ""
             if readme:
                 current = ' aria-current="page"' if readme["path"] == active else ""
                 label = (f'<a class="folder-readme" href="{prefix}{readme["url"]}"{current} '
                          f'title="Открыть {esc(readme["path"], quote=True)}">{label}</a>')
             else:
-                label = f'<span class="folder-label">{label}</span>'
-            result.append(f'<details class="tree-folder"><summary title="Раскрыть или свернуть папку">'
+                label = f'<a class="folder-browse" href="{href}"{current_folder}>{label}</a>'
+            direct_link = (f'<a class="folder-direct-link" href="{href}"{current_folder} '
+                           f'aria-label="Открыть страницу папки {esc(full[:-1], quote=True)}" '
+                           f'title="Открыть страницу папки">'
+                           f'<span class="nerd-icon" aria-hidden="true">&#xf0c1;</span></a>')
+            result.append(f'<details class="tree-folder" data-folder-path="{esc(full[:-1], quote=True)}">'
+                          f'<summary title="Раскрыть или свернуть папку">'
                           f'<svg class="folder-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-                          f'<path d="m9 5 7 7-7 7"/></svg>{label}</summary>'
+                          f'<path d="m9 5 7 7-7 7"/></svg>{label}{direct_link}</summary>'
                           f'<div class="tree-children">{render(child, full)}</div></details>')
         for file in node["files"]:
             selected = ' aria-current="page"' if file["path"] == active else ""
@@ -202,7 +248,8 @@ def revision(root: Path) -> str:
         return ""
 
 
-def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, rev: str, active: str = "") -> str:
+def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, rev: str,
+           active: str = "", folders: list[str] | None = None, active_folder: str = "") -> str:
     repo = "https://github.com/" + config["repository"]
     count = len(files)
     version = f'<a href="{repo}/commit/{rev}">{rev[:7]}</a>' if rev else 'локальная сборка'
@@ -230,7 +277,8 @@ def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, 
 <label class="search-box js-only" hidden><span class="sr-only">Поиск файлов</span>
 <input id="search" type="search" placeholder="Найти файл…" autocomplete="off" spellcheck="false"><kbd>/</kbd></label>
 <a class="overview-link" href="{prefix}">Все файлы <span>↗</span></a>
-<nav class="file-tree" aria-label="Дерево файлов">{tree_html(files, prefix, active)}</nav>
+<a class="folders-overview-link" href="{prefix}folders/">Обзор папок <span aria-hidden="true">↗</span></a>
+<nav class="file-tree" aria-label="Дерево файлов">{tree_html(files, prefix, active, folders, active_folder)}</nav>
 <p class="no-results" id="tree-empty" role="status" hidden>Ничего не найдено.</p>
 <div class="sidebar-note"><span class="status-dot"></span> Статическая коллекция<br><span>Без сервера. Без лишнего.</span></div>
 </aside><main id="main" class="main-content">{body}
@@ -238,7 +286,17 @@ def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, 
 </main></div><div id="toast" class="toast" role="status" hidden></div></body></html>'''
 
 
-def homepage(config: dict, files: list[dict]) -> str:
+def homepage(config: dict, files: list[dict], folders: list[str] | None = None) -> str:
+    roots = [f for f in (folders or []) if "/" not in f]
+    tiles = "".join(f'<a class="home-folder-link" href="{folder_url(name)}">'
+                    f'{folder_icon("./")}<span class="folder-name">{esc(name)}</span>'
+                    f'<span class="home-folder-arrow" aria-hidden="true">↗</span></a>'
+                    for name in roots)
+    root_section = ('<section aria-label="Папки"><div class="section-heading">'
+                    f'<h2>Папки <span>{len(roots)}</span></h2>'
+                    '<a class="source-link" href="folders/">Открыть файловый менеджер ↗</a></div>'
+                    f'<div class="home-folder-grid">{tiles}</div></section>') if roots else (
+                    '<p class="browse-root-link"><a href="folders/">Открыть папку code/ ↗</a></p>')
     languages = sorted({f["language"] for f in files})
     options = ''.join(f'<option value="{esc(lang, quote=True)}">{esc(lang)}</option>' for lang in languages)
     rows = []
@@ -254,6 +312,7 @@ def homepage(config: dict, files: list[dict]) -> str:
 <h1>{esc(config['title'])}<span class="accent">.</span></h1><p class="hero-subtitle">{esc(config['subtitle'])}</p>
 <div class="stats"><span><strong>{len(files):02d}</strong> {plural(len(files), "файл", "файла", "файлов")}</span><span><strong>{len(languages):02d}</strong> {plural(len(languages), "язык / формат", "языка / формата", "языков / форматов")}</span>
 <span><strong>{sum(f['lines'] for f in files)}</strong> {plural(sum(f["lines"] for f in files), "строка", "строки", "строк")}</span></div></section>
+{root_section}
 <section aria-label="Коллекция файлов"><div class="section-heading"><h2>Все файлы <span id="result-count">{len(files)}</span></h2>
 <label class="language-filter js-only" hidden><span class="sr-only">Фильтр по языку</span><select id="language"><option value="">Все языки</option>{options}</select></label></div>
 <div class="file-list">{''.join(rows)}{empty}</div><p id="list-empty" class="empty-state" role="status" hidden>Ничего не найдено. Попробуй другой запрос.</p></section>
@@ -261,12 +320,56 @@ def homepage(config: dict, files: list[dict]) -> str:
 <span>Добавляй исходники в <code>code/</code> — сайт обновится после публикации коммита.</span></p></div>'''
 
 
+def folderpage(config: dict, files: list[dict], folders: list[str], folder: str, prefix: str, rev: str) -> str:
+    """Static folder page with direct children only, like a file manager."""
+    children = [f for f in folders if f.rpartition("/")[0] == folder]
+    direct_files = [f for f in files if f["folder"] == (folder or ".")]
+    rows = []
+    for child in children:
+        name = child.rsplit("/", 1)[-1]
+        rows.append(f'<a class="file-row folder-row" href="{prefix}{folder_url(child)}" '
+                    f'data-search="{esc(child, quote=True)}" data-language="folder">'
+                    f'<span class="file-badge">{folder_icon(prefix)}</span><span class="file-label">'
+                    f'<strong>{esc(name)}</strong><small>Папка</small></span>'
+                    f'<span class="language-label">Каталог</span><span class="row-lines"></span>'
+                    '<span class="row-arrow" aria-hidden="true">↗</span></a>')
+    for file in direct_files:
+        rows.append(f'<a class="file-row" href="{prefix}{file["url"]}" '
+                    f'data-search="{esc(file["path"] + " " + file["language"], quote=True)}" '
+                    f'data-language="{esc(file["language"], quote=True)}">'
+                    f'<span class="file-badge">{file_icon(file, prefix)}</span><span class="file-label">'
+                    f'<strong>{esc(file["name"])}</strong><small>{esc(file["language"])}</small></span>'
+                    f'<span class="language-label">{esc(file["language"])}</span>'
+                    f'<span class="row-lines">{file["lines"]} стр.</span>'
+                    '<span class="row-arrow" aria-hidden="true">↗</span></a>')
+    ref = rev or config["branch"]
+    source_path = config["source"].strip("/") + ("/" + folder if folder else "")
+    github = ("https://github.com/" + config["repository"] + "/tree/" +
+              quote(ref, safe="") + "/" + quote(source_path, safe="/"))
+    name = folder.rsplit("/", 1)[-1] if folder else config["source"].strip("/")
+    empty = '<p class="directory-empty">В этой папке пока нет публикуемых файлов и подпапок.</p>' if not rows else ""
+    return (f'{breadcrumbs(folder, prefix)}'
+            f'<section class="directory-heading"><div><div class="eyebrow">ПАПКА · {esc(source_path)}</div>'
+            f'<h1>{esc(name)}<span class="accent">/</span></h1>'
+            f'<p>{len(children)} {plural(len(children), "папка", "папки", "папок")} · '
+            f'{len(direct_files)} {plural(len(direct_files), "файл", "файла", "файлов")}</p></div>'
+            f'<div class="directory-actions"><button id="copy-folder-link" '
+            f'class="toolbar-button copy-folder-link js-only" type="button" hidden>'
+            f'Скопировать ссылку</button>'
+            f'<a class="source-link" href="{github}">Открыть на GitHub ↗</a></div></section>'
+            f'<section aria-label="Содержимое папки">'
+            f'<div class="section-heading"><h2>Содержимое <span id="result-count">{len(rows)}</span></h2></div>'
+            f'<div class="file-list directory-list">{"".join(rows)}{empty}</div>'
+            '<p id="list-empty" class="empty-state" role="status" hidden>'
+            'В этой папке ничего не найдено.</p></section>')
+
+
 def filepage(config: dict, file: dict, prefix: str, rev: str) -> str:
     ref = rev or config["branch"]
     path = config["source"].strip("/") + "/" + file["path"]
     github = "https://github.com/" + config["repository"] + "/blob/" + quote(ref, safe="") + "/" + quote(path, safe="/")
     size = f'{file["size"] / 1024:.1f} КБ' if file["size"] >= 1024 else f'{file["size"]} Б'
-    return f'''<div class="breadcrumbs"><a href="{prefix}">Коллекция</a><span>/</span><span>{esc(file['path'])}</span></div>
+    return f'''{breadcrumbs(file["path"], prefix)}
 <section class="file-heading"><div><div class="eyebrow">{esc(file['language'])}</div><h1>{esc(file['name'])}</h1>
 <p>{file['lines']} {plural(file['lines'], 'строка', 'строки', 'строк')} <span>·</span> {size} <span>·</span> UTF-8</p></div><a class="source-link" href="{github}">Открыть на GitHub ↗</a></section>
 <section class="code-panel" aria-label="Просмотр исходника"><div class="code-toolbar"><span class="code-tab">{file_icon(file, prefix)}{esc(file['name'])}</span>
@@ -290,20 +393,28 @@ def build(root: Path = ROOT) -> tuple[int, Path]:
     if output.is_symlink():
         raise ValueError("dist не должен быть символьной ссылкой.")
     files = collect(source, config)
+    folders = collect_folders(source, config)
     if output.exists():
         shutil.rmtree(output)
     (output / "raw").mkdir(parents=True)
     shutil.copytree(root / "site" / "assets", output / "assets")
     # syntax.css is copied with assets and uses shared Catppuccin CSS variables.
     rev = revision(root)
-    (output / "index.html").write_text(layout(config, files, homepage(config, files), "./", config["title"], rev), encoding="utf-8")
+    (output / "index.html").write_text(layout(config, files, homepage(config, files, folders), "./", config["title"], rev, folders=folders), encoding="utf-8")
     for file in files:
         page = output / "files" / file["path"] / "index.html"
         page.parent.mkdir(parents=True, exist_ok=True)
         prefix = "../" * (len(Path(file["path"]).parts) + 1)
         page.write_text(layout(config, files, filepage(config, file, prefix, rev), prefix,
-                               file["name"], rev, file["path"]), encoding="utf-8")
+                               file["name"], rev, file["path"], folders=folders), encoding="utf-8")
         (output / file["raw_url"]).write_bytes(file["raw"])
+    for folder in ["", *folders]:
+        page = output / "folders" / folder / "index.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        prefix = "../" * (len(Path(folder).parts) + 1)
+        page.write_text(layout(config, files, folderpage(config, files, folders, folder, prefix, rev),
+                               prefix, folder.rsplit("/", 1)[-1] if folder else config["source"],
+                               rev, folders=folders, active_folder=folder), encoding="utf-8")
     (output / ".nojekyll").write_text("", encoding="utf-8")
     (output / "_headers").write_text(f"/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: {CSP}; frame-ancestors 'none'\n", encoding="utf-8")
     print(f"Готово: файлов — {len(files)} → {output}")
