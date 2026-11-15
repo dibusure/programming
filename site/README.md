@@ -3,6 +3,16 @@
 `build.py` reads the source directory from `site.toml`, highlights source files
 without executing them, and writes the static website to `dist/`.
 
+## Interface
+
+The layout shows only functional controls: the file tree and search, a link to
+the root directory, the repository link, and light/dark theme choices. The home
+page has direct links to top-level folders, a file list, and a language filter.
+Directory pages have breadcrumbs, a copy-link action and a GitHub link; file
+pages have breadcrumbs, a GitHub link, line permalinks, wrap, copy and download.
+Decorative hero copy, usage notes, counters, arrows, redundant labels and the
+footer have been removed. Both desktop and mobile layouts remain supported.
+
 ## File explorer
 
 Every folder starts collapsed, including folders containing the current file.
@@ -11,9 +21,10 @@ The chevron expands or collapses a folder independently of navigation.
 A folder with a direct child named `Readme.md` links its name and folder icon to
 that file's page. Matching is case-insensitive: `README.md` and `readme.md` work
 too. A README in a nested subfolder is not used for its parent. A folder without a README opens its directory page when its name is clicked.
-Every folder also has a separate link icon pointing to the directory page,
-so README navigation and folder browsing are independent. The chevron controls
-expansion. Native `details` and `summary` preserve keyboard access.
+Only folders with a README have a separate directory-link icon: in all other
+folders the folder name already opens the directory, so the extra link would
+be redundant. The chevron controls expansion. Native `details` and `summary`
+preserve keyboard access.
 
 Each visible directory, including an empty one, has a direct static URL at
 `/folders/<path>/`. `/folders/` is the root `code/` directory.
