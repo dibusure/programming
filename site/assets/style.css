@@ -114,6 +114,7 @@ code {font-family:var(--mono)}
 .folder-readme,.folder-browse {display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:6px 3px;border-radius:4px}
 .folder-readme:hover,.folder-browse:hover,.folder-direct-link:hover,.folder-readme[aria-current="page"],.folder-browse[aria-current="page"],.folder-direct-link[aria-current="page"] {color:var(--accent)}
 .folder-direct-link {display:grid;place-items:center;flex-shrink:0;width:28px;min-height:32px;color:var(--muted)}
+.folder-direct-link .nerd-icon {font-family:"Symbols Nerd Font";font-style:normal;font-synthesis:none;line-height:1}
 .folder-name,.file-name {min-width:0;overflow-wrap:anywhere}
 .tree-children {margin-left:12px;padding-left:10px;border-left:1px solid var(--line)}
 .tree-file {display:flex;align-items:center;gap:8px;padding:7px 6px;margin:2px 0;border-radius:5px;overflow-wrap:anywhere}
