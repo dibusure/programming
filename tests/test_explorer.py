@@ -24,6 +24,28 @@ class ExplorerTests(unittest.TestCase):
     tearDown = test_build.GalleryTests.tearDown
     put = test_build.GalleryTests.put
 
+    def test_minimal_interface_keeps_navigation_and_file_actions(self):
+        self.put('src/hello.py', 'print("hi")')
+        _, output = builder.build(self.root)
+        home = (output / 'index.html').read_text()
+        page = (output / 'files/src/hello.py/index.html').read_text()
+        for markup in (home, page):
+            for extra in ('class="hero"', 'class="sidebar-note"', 'class="footer"',
+                          'class="usage-note"', 'class="brand-mark"', 'class="overview-link"'):
+                self.assertNotIn(extra, markup)
+            self.assertIn('id="search"', markup)
+            self.assertIn('class="sidebar-root"', markup)
+            self.assertIn('id="theme-switch"', markup)
+        self.assertIn('id="language"', home)
+        self.assertIn('class="home-folder-grid"', home)
+        self.assertIn('id="copy-code"', page)
+        self.assertIn('id="wrap-toggle"', page)
+        self.assertIn('download="hello.py"', page)
+        self.assertNotIn('class="code-tab"', page)
+        app = (ROOT / 'site/assets/app.js').read_text()
+        self.assertIn("$$('.folder-readme, .folder-browse, .folder-direct-link').forEach", app)
+        self.assertIn("$$('.tree-file').some", app)
+
     def test_folders_closed_even_on_nested_active_page(self):
         self.put('outer/inner/main.hs', 'main = pure ()')
         _, output = builder.build(self.root)
