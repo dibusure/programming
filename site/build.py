@@ -207,7 +207,7 @@ def tree_html(files: list[dict], prefix: str, active: str = "",
         for name, child in sorted(node["dirs"].items(), key=lambda item: item[0].casefold()):
             full = trail + name + "/"
             # All folders start closed, including ancestors of the current file.
-            # An anchor inside summary navigates; the independent chevron toggles details.
+            # Folder names navigate; README folders also expose a link to browse their directory.
             readme = next((f for f in sorted(child["files"], key=lambda f: f["name"])
                            if f["name"].casefold() == "readme.md"), None)
             label = f'{folder_icon(prefix)}<span class="folder-name">{esc(name)}</span>'
@@ -222,7 +222,7 @@ def tree_html(files: list[dict], prefix: str, active: str = "",
             direct_link = (f'<a class="folder-direct-link" href="{href}"{current_folder} '
                            f'aria-label="Открыть страницу папки {esc(full[:-1], quote=True)}" '
                            f'title="Открыть страницу папки">'
-                           f'<span class="nerd-icon" aria-hidden="true">&#xf0c1;</span></a>')
+                           f'<span class="nerd-icon" aria-hidden="true">&#xf0c1;</span></a>') if readme else ""
             result.append(f'<details class="tree-folder" data-folder-path="{esc(full[:-1], quote=True)}">'
                           f'<summary title="Раскрыть или свернуть папку">'
                           f'<svg class="folder-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
@@ -251,8 +251,6 @@ def revision(root: Path) -> str:
 def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, rev: str,
            active: str = "", folders: list[str] | None = None, active_folder: str = "") -> str:
     repo = "https://github.com/" + config["repository"]
-    count = len(files)
-    version = f'<a href="{repo}/commit/{rev}">{rev[:7]}</a>' if rev else 'локальная сборка'
     return f'''<!doctype html>
 <html lang="ru" data-theme="latte"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="{esc(CSP, quote=True)}">
@@ -264,39 +262,27 @@ def layout(config: dict, files: list[dict], body: str, prefix: str, title: str, 
 <link rel="stylesheet" href="{prefix}assets/nerd-icons.css">
 <script src="{prefix}assets/app.js" defer></script></head>
 <body><a class="skip-link" href="#main">Перейти к содержимому</a>
-<header class="topbar"><a class="brand" href="{prefix}"><span class="brand-mark" aria-hidden="true">λ</span>
-<span>dibusure<span class="brand-slash"> / </span><strong>{esc(config['title'])}</strong></span></a>
-<div class="top-actions"><a class="github-link" href="{repo}">GitHub ↗</a>
-<div id="theme-switch" class="theme-switch" role="group" aria-label="Catppuccin: цветовая тема" hidden>
-<button class="theme-choice" data-theme-choice="latte" type="button" aria-pressed="true" title="Catppuccin Latte — светлая тема">
-<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>Latte</button>
-<button class="theme-choice" data-theme-choice="mocha" type="button" aria-pressed="false" title="Catppuccin Mocha — тёмная тема">
-<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M20.5 13.5A8.5 8.5 0 0 1 10.5 3a8.5 8.5 0 1 0 10 10.5Z"/></svg>Mocha</button></div></div></header>
+<header class="topbar"><a class="brand" href="{prefix}">{esc(config['title'])}</a>
+<div class="top-actions"><a class="github-link" href="{repo}">GitHub</a>
+<div id="theme-switch" class="theme-switch" role="group" aria-label="Цветовая тема" hidden>
+<button class="theme-choice" data-theme-choice="latte" type="button" aria-pressed="true" title="Светлая тема">Светлая</button>
+<button class="theme-choice" data-theme-choice="mocha" type="button" aria-pressed="false" title="Тёмная тема">Тёмная</button></div></div></header>
 <div class="workspace"><aside class="sidebar" aria-label="Навигация по файлам">
-<div class="sidebar-title"><span>ИСХОДНИКИ</span><span class="count">{count:02d}</span></div>
 <label class="search-box js-only" hidden><span class="sr-only">Поиск файлов</span>
-<input id="search" type="search" placeholder="Найти файл…" autocomplete="off" spellcheck="false"><kbd>/</kbd></label>
-<a class="overview-link" href="{prefix}">Все файлы <span>↗</span></a>
-<a class="folders-overview-link" href="{prefix}folders/">Обзор папок <span aria-hidden="true">↗</span></a>
+<input id="search" type="search" placeholder="Найти файл…" autocomplete="off" spellcheck="false"></label>
+<a class="sidebar-root" href="{prefix}folders/">code/</a>
 <nav class="file-tree" aria-label="Дерево файлов">{tree_html(files, prefix, active, folders, active_folder)}</nav>
 <p class="no-results" id="tree-empty" role="status" hidden>Ничего не найдено.</p>
-<div class="sidebar-note"><span class="status-dot"></span> Статическая коллекция<br><span>Без сервера. Без лишнего.</span></div>
-</aside><main id="main" class="main-content">{body}
-<footer class="footer"><span>{esc(config['repository'])}</span><span>Pygments · {version}</span></footer>
-</main></div><div id="toast" class="toast" role="status" hidden></div></body></html>'''
-
+</aside><main id="main" class="main-content">{body}</main></div>
+<div id="toast" class="toast" role="status" hidden></div></body></html>'''
 
 def homepage(config: dict, files: list[dict], folders: list[str] | None = None) -> str:
     roots = [f for f in (folders or []) if "/" not in f]
     tiles = "".join(f'<a class="home-folder-link" href="{folder_url(name)}">'
-                    f'{folder_icon("./")}<span class="folder-name">{esc(name)}</span>'
-                    f'<span class="home-folder-arrow" aria-hidden="true">↗</span></a>'
+                    f'{folder_icon("./")}<span class="folder-name">{esc(name)}</span></a>'
                     for name in roots)
-    root_section = ('<section aria-label="Папки"><div class="section-heading">'
-                    f'<h2>Папки <span>{len(roots)}</span></h2>'
-                    '<a class="source-link" href="folders/">Открыть файловый менеджер ↗</a></div>'
-                    f'<div class="home-folder-grid">{tiles}</div></section>') if roots else (
-                    '<p class="browse-root-link"><a href="folders/">Открыть папку code/ ↗</a></p>')
+    root_section = (f'<section class="folder-section" aria-label="Папки"><h2>Папки</h2>'
+                    f'<div class="home-folder-grid">{tiles}</div></section>') if roots else ""
     languages = sorted({f["language"] for f in files})
     options = ''.join(f'<option value="{esc(lang, quote=True)}">{esc(lang)}</option>' for lang in languages)
     rows = []
@@ -304,21 +290,16 @@ def homepage(config: dict, files: list[dict], folders: list[str] | None = None) 
         folder = config["source"].strip("/") + "/" + (file["folder"] + "/" if file["folder"] != "." else "")
         rows.append(f'<a class="file-row" data-search="{esc(file["path"] + " " + file["language"], quote=True)}" '
                     f'data-language="{esc(file["language"], quote=True)}" href="{file["url"]}">'
-                    f'<span class="file-badge">{file_icon(file, "./")}</span><span class="file-label"><strong>{esc(file["name"])}</strong>'
-                    f'<small>{esc(folder)}</small></span><span class="language-label">{esc(file["language"])}</span>'
-                    f'<span class="row-lines">{file["lines"]} стр.</span><span class="row-arrow" aria-hidden="true">↗</span></a>')
+                    f'<span class="file-badge">{file_icon(file, "./")}</span><span class="file-label">'
+                    f'<strong>{esc(file["name"])}</strong><small>{esc(folder)}</small></span></a>')
     empty = '<div class="empty-state"><h2>Здесь начинается коллекция.</h2><p>Добавь первый исходник в папку <code>code/</code> и сделай push.</p></div>' if not files else ""
-    return f'''<section class="hero"><div class="eyebrow"><span class="status-dot"></span> ЛИЧНАЯ КОЛЛЕКЦИЯ КОДА</div>
-<h1>{esc(config['title'])}<span class="accent">.</span></h1><p class="hero-subtitle">{esc(config['subtitle'])}</p>
-<div class="stats"><span><strong>{len(files):02d}</strong> {plural(len(files), "файл", "файла", "файлов")}</span><span><strong>{len(languages):02d}</strong> {plural(len(languages), "язык / формат", "языка / формата", "языков / форматов")}</span>
-<span><strong>{sum(f['lines'] for f in files)}</strong> {plural(sum(f["lines"] for f in files), "строка", "строки", "строк")}</span></div></section>
+    return f'''<h1 class="page-title">Исходники</h1>
 {root_section}
-<section aria-label="Коллекция файлов"><div class="section-heading"><h2>Все файлы <span id="result-count">{len(files)}</span></h2>
-<label class="language-filter js-only" hidden><span class="sr-only">Фильтр по языку</span><select id="language"><option value="">Все языки</option>{options}</select></label></div>
-<div class="file-list">{''.join(rows)}{empty}</div><p id="list-empty" class="empty-state" role="status" hidden>Ничего не найдено. Попробуй другой запрос.</p></section>
-<div class="usage-note"><span class="note-symbol" aria-hidden="true">↳</span><p>Обычные файлы. Красивое чтение.<br>
-<span>Добавляй исходники в <code>code/</code> — сайт обновится после публикации коммита.</span></p></div>'''
-
+<section aria-label="Коллекция файлов"><div class="section-heading"><h2>Файлы <span id="result-count">{len(files)}</span></h2>
+<label class="language-filter js-only" hidden><span class="sr-only">Фильтр по языку</span>
+<select id="language"><option value="">Все языки</option>{options}</select></label></div>
+<div class="file-list">{''.join(rows)}{empty}</div>
+<p id="list-empty" class="empty-state" role="status" hidden>Ничего не найдено. Попробуй другой запрос.</p></section>'''
 
 def folderpage(config: dict, files: list[dict], folders: list[str], folder: str, prefix: str, rev: str) -> str:
     """Static folder page with direct children only, like a file manager."""
@@ -330,18 +311,13 @@ def folderpage(config: dict, files: list[dict], folders: list[str], folder: str,
         rows.append(f'<a class="file-row folder-row" href="{prefix}{folder_url(child)}" '
                     f'data-search="{esc(child, quote=True)}" data-language="folder">'
                     f'<span class="file-badge">{folder_icon(prefix)}</span><span class="file-label">'
-                    f'<strong>{esc(name)}</strong><small>Папка</small></span>'
-                    f'<span class="language-label">Каталог</span><span class="row-lines"></span>'
-                    '<span class="row-arrow" aria-hidden="true">↗</span></a>')
+                    f'<strong>{esc(name)}</strong></span></a>')
     for file in direct_files:
         rows.append(f'<a class="file-row" href="{prefix}{file["url"]}" '
                     f'data-search="{esc(file["path"] + " " + file["language"], quote=True)}" '
                     f'data-language="{esc(file["language"], quote=True)}">'
                     f'<span class="file-badge">{file_icon(file, prefix)}</span><span class="file-label">'
-                    f'<strong>{esc(file["name"])}</strong><small>{esc(file["language"])}</small></span>'
-                    f'<span class="language-label">{esc(file["language"])}</span>'
-                    f'<span class="row-lines">{file["lines"]} стр.</span>'
-                    '<span class="row-arrow" aria-hidden="true">↗</span></a>')
+                    f'<strong>{esc(file["name"])}</strong></span></a>')
     ref = rev or config["branch"]
     source_path = config["source"].strip("/") + ("/" + folder if folder else "")
     github = ("https://github.com/" + config["repository"] + "/tree/" +
@@ -349,37 +325,28 @@ def folderpage(config: dict, files: list[dict], folders: list[str], folder: str,
     name = folder.rsplit("/", 1)[-1] if folder else config["source"].strip("/")
     empty = '<p class="directory-empty">В этой папке пока нет публикуемых файлов и подпапок.</p>' if not rows else ""
     return (f'{breadcrumbs(folder, prefix)}'
-            f'<section class="directory-heading"><div><div class="eyebrow">ПАПКА · {esc(source_path)}</div>'
-            f'<h1>{esc(name)}<span class="accent">/</span></h1>'
-            f'<p>{len(children)} {plural(len(children), "папка", "папки", "папок")} · '
-            f'{len(direct_files)} {plural(len(direct_files), "файл", "файла", "файлов")}</p></div>'
+            f'<section class="directory-heading"><h1>{esc(name)}</h1>'
             f'<div class="directory-actions"><button id="copy-folder-link" '
-            f'class="toolbar-button copy-folder-link js-only" type="button" hidden>'
-            f'Скопировать ссылку</button>'
-            f'<a class="source-link" href="{github}">Открыть на GitHub ↗</a></div></section>'
-            f'<section aria-label="Содержимое папки">'
-            f'<div class="section-heading"><h2>Содержимое <span id="result-count">{len(rows)}</span></h2></div>'
+            f'class="toolbar-button copy-folder-link js-only" type="button" hidden>Копировать ссылку</button>'
+            f'<a class="source-link" href="{github}">GitHub</a></div></section>'
             f'<div class="file-list directory-list">{"".join(rows)}{empty}</div>'
             '<p id="list-empty" class="empty-state" role="status" hidden>'
-            'В этой папке ничего не найдено.</p></section>')
-
+            'В этой папке ничего не найдено.</p>')
 
 def filepage(config: dict, file: dict, prefix: str, rev: str) -> str:
     ref = rev or config["branch"]
     path = config["source"].strip("/") + "/" + file["path"]
-    github = "https://github.com/" + config["repository"] + "/blob/" + quote(ref, safe="") + "/" + quote(path, safe="/")
-    size = f'{file["size"] / 1024:.1f} КБ' if file["size"] >= 1024 else f'{file["size"]} Б'
+    github = ("https://github.com/" + config["repository"] + "/blob/" +
+              quote(ref, safe="") + "/" + quote(path, safe="/"))
     return f'''{breadcrumbs(file["path"], prefix)}
-<section class="file-heading"><div><div class="eyebrow">{esc(file['language'])}</div><h1>{esc(file['name'])}</h1>
-<p>{file['lines']} {plural(file['lines'], 'строка', 'строки', 'строк')} <span>·</span> {size} <span>·</span> UTF-8</p></div><a class="source-link" href="{github}">Открыть на GitHub ↗</a></section>
-<section class="code-panel" aria-label="Просмотр исходника"><div class="code-toolbar"><span class="code-tab">{file_icon(file, prefix)}{esc(file['name'])}</span>
+<section class="file-heading"><h1>{esc(file['name'])}</h1>
+<a class="source-link" href="{github}">GitHub</a></section>
+<section class="code-panel" aria-label="Просмотр исходника"><div class="code-toolbar">
 <div class="code-actions"><button id="wrap-toggle" class="toolbar-button js-only" type="button" aria-pressed="false" hidden>Перенос</button>
 <button id="copy-code" class="toolbar-button js-only" type="button" hidden>Копировать</button>
 <a class="toolbar-button" href="{prefix}{file['raw_url']}" download="{esc(file['name'], quote=True)}">Скачать</a></div></div>
 <div class="code-scroll">{code_html(file['text'], file['lexer'])}</div></section>
-<p class="code-hint">Номер строки — прямая ссылка на неё. Код показан как текст и не выполняется.</p>
 <textarea id="raw-source" hidden>\n{esc(file['text'])}</textarea>'''
-
 
 def build(root: Path = ROOT) -> tuple[int, Path]:
     config = tomllib.loads((root / "site.toml").read_text(encoding="utf-8"))
