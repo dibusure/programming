@@ -30,6 +30,8 @@ jobs:
         run: uv sync --locked
       - name: Test the generator
         run: uv run --locked python -m unittest discover -s tests -v
+      - name: Test client-side controls
+        run: node --test tests/*.test.cjs
       - name: Build the static site
         run: uv run --locked python site/build.py
       - name: Upload Pages artifact
