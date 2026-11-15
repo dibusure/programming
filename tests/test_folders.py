@@ -97,7 +97,7 @@ class DirectoryPagesTests(unittest.TestCase):
         direct = [a['href'] for a in parser.links if a.get('class') == 'folder-direct-link']
         browse = [a['href'] for a in parser.links if a.get('class') == 'folder-browse']
         self.assertEqual(readme, ['./files/docs/Readme.md/'])
-        self.assertEqual(set(direct), {'./folders/docs/', './folders/misc/'})
+        self.assertEqual(set(direct), {'./folders/docs/'})  # Only README folders need a separate directory link.
         self.assertEqual(browse, ['./folders/misc/'])
         self.assertTrue(all('open' not in d for d in parser.folders))
         app = (self.root / 'site/assets/app.js').read_text()
